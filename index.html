@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ro" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOMIS SANCTUARY | Boutique Retreat & Glamping Constanța</title>
+
+    <!-- Google Fonts: Cormorant Garamond & Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS (Pentru Harta Interactivă) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Configurare Design System -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sand: '#F4F1EA',
+                        sandDark: '#E6E1D6',
+                        sea: '#1C2421',
+                        gold: '#B89B72',
+                        stone: '#6E706E'
+                    },
+                    fontFamily: {
+                        serif: ['"Cormorant Garamond"', 'serif'],
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    transitionTimingFunction: {
+                        'luxury': 'cubic-bezier(0.16, 1, 0.3, 1)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Custom CSS pentru Preloader, Hartă și Micro-interacțiuni -->
+    <style>
+        body {
+            background-color: #F4F1EA;
+            color: #1C2421;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Blochează scroll-ul în timpul preloader-ului */
+        body.loading {
+            overflow: hidden;
+        }
+
+        /* ================= PRELOADER STYLES ================= */
+        #preloader {
+            transition: transform 1.2s cubic-bezier(0.77, 0, 0.175, 1);
+        }
+        #preloader.loaded {
+            transform: translateY(-100%);
+        }
+        .loader-line {
+            width: 0%;
+            transition: width 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .loader-text {
+            opacity: 0;
+            transform: translateY(15px);
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .loader-text.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Zoom-out subtil pe video la ridicarea cortinei */
+        #hero-video {
+            transform: scale(1.15);
+            transition: transform 2.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        body:not(.loading) #hero-video {
+            transform: scale(1.03);
+        }
+
+        /* ================= REVEAL & CARDS ================= */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .room-card .img-wrapper img {
+            transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .room-card:hover .img-wrapper img {
+            transform: scale(1.06);
+        }
+
+        .hover-line {
+            position: relative;
+        }
+        .hover-line::after {
+            content: '';
+            position: absolute;
+            width: 0%;
+            height: 1px;
+            bottom: -4px;
+            left: 0;
+            background-color: currentColor;
+            transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .hover-line:hover::after {
+            width: 100%;
+        }
+
+        /* ================= STILIZARE HARTĂ CUSTOM ================= */
+        /* Filtru editorial peste tile-urile CartoDB Dark pentru tonuri #1C2421 & #B89B72 */
+        .leaflet-tile-pane {
+            filter: sepia(25%) hue-rotate(115deg) saturate(80%) brightness(95%) contrast(105%);
+        }
+        .leaflet-container {
+            background: #1C2421 !important;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        /* Atribuire discretă (cerută de furnizorul de tile-uri) */
+        .leaflet-control-attribution {
+            background: rgba(28, 36, 33, 0.7) !important;
+            color: rgba(244, 241, 234, 0.45) !important;
+            font-size: 9px !important;
+        }
+        .leaflet-control-attribution a {
+            color: rgba(184, 155, 114, 0.7) !important;
+        }
+
+        /* Pin Pulsatoriu Auriu */
+        .custom-pin {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pin-core {
+            width: 12px;
+            height: 12px;
+            background-color: #B89B72;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #B89B72;
+            position: relative;
+            z-index: 2;
+        }
+        .pin-pulse {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            border: 1px solid #B89B72;
+            border-radius: 50%;
+            animation: pulse-ring 2.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.4); opacity: 1; }
+            100% { transform: scale(1.8); opacity: 0; }
+        }
+
+        /* Tooltip Hartă Minimalist */
+        .leaflet-popup-content-wrapper {
+            background: #F4F1EA !important;
+            color: #1C2421 !important;
+            border-radius: 0px !important;
+            padding: 4px !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4) !important;
+        }
+        .leaflet-popup-tip {
+            background: #F4F1EA !important;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #F4F1EA; }
+        ::-webkit-scrollbar-thumb { background: #B89B72; }
+
+        /* Carusel orizontal fără scrollbar vizibil */
+        .no-scrollbar { scrollbar-width: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* ================= MENIU MOBIL ================= */
+        #mobile-menu {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.5s;
+        }
+        #mobile-menu.open {
+            opacity: 1;
+            visibility: visible;
+        }
+        #mobile-menu .menu-link {
+            opacity: 0;
+            transform: translateY(16px);
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #mobile-menu.open .menu-link {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        #mobile-menu.open .menu-link:nth-child(2) { transition-delay: 0.06s; }
+        #mobile-menu.open .menu-link:nth-child(3) { transition-delay: 0.12s; }
+        #mobile-menu.open .menu-link:nth-child(4) { transition-delay: 0.18s; }
+
+        /* ================= AJUSTĂRI EXCLUSIV MOBIL (< 768px) ================= */
+        @media (max-width: 767px) {
+            body { -webkit-tap-highlight-color: transparent; }
+
+            /* Navbar mai compact (suprascrie py-6 / py-4 setate din JS) */
+            #navbar { padding-top: 0.9rem; padding-bottom: 0.9rem; }
+            #navbar .logo-tagline { font-size: 7.5px; letter-spacing: 0.28em; }
+
+            /* Fără efect de zoom pe imagini la atingere */
+            .room-card:hover .img-wrapper img { transform: none; }
+        }
+    </style>
+</head>
+<body class="font-sans font-light selection:bg-sea selection:text-sand loading">
+
+    <!-- ================= PRELOADER ELEGANT ================= -->
+    <div id="preloader" class="fixed inset-0 z-[100] bg-sea text-sand flex flex-col justify-between p-8 md:p-16">
+        <div class="flex justify-between items-center text-[9px] md:text-[10px] uppercase tracking-[0.18em] md:tracking-[0.3em] text-sand/50 loader-text" id="loader-top">
+            <span>Constanța • România</span>
+            <span>44.1598° N, 28.6348° E</span>
+        </div>
+
+        <div class="my-auto text-center max-w-md mx-auto w-full">
+            <div class="loader-text" id="loader-center">
+                <span class="font-serif text-4xl md:text-6xl tracking-[0.2em] block font-light mb-3">TOMIS</span>
+                <span class="text-[10px] uppercase tracking-[0.45em] text-gold block mb-8">Sanctuary & Glamping</span>
+            </div>
+            <!-- Bara de progres minimalista -->
+            <div class="w-full h-[1px] bg-sand/15 overflow-hidden">
+                <div id="loader-bar" class="loader-line h-full bg-gold"></div>
+            </div>
+        </div>
+
+        <div class="text-center text-[10px] uppercase tracking-[0.3em] text-sand/40 loader-text" id="loader-bottom">
+            <span>Se pregătește atmosfera...</span>
+        </div>
+    </div>
+
+    <!-- ================= NAVBAR ================= -->
+    <header id="navbar" class="fixed top-0 left-0 w-full z-50 transition-all duration-500 py-6 px-6 md:px-16 text-white">
+        <div class="relative max-w-7xl mx-auto flex justify-between items-center">
+            <!-- Buton meniu (doar mobil) -->
+            <button type="button" onclick="toggleMenu(true)" aria-label="Deschide meniul" class="md:hidden -ml-2 p-2 flex flex-col justify-center gap-[5px]">
+                <span class="block w-6 h-px bg-current"></span>
+                <span class="block w-4 h-px bg-current"></span>
+            </button>
+
+            <nav class="hidden md:flex space-x-10 text-xs uppercase tracking-[0.2em]">
+                <a href="#sanctuar" class="hover-line">Sanctuarul</a>
+                <a href="#cazare" class="hover-line">Refugii</a>
+                <a href="#experienta" class="hover-line">Experiența</a>
+                <a href="#harta" class="hover-line">Coasta</a>
+            </nav>
+
+            <a href="#" class="text-center group absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0">
+                <span class="font-serif text-2xl md:text-3xl tracking-[0.15em] block font-normal">TOMIS</span>
+                <span class="logo-tagline text-[9px] uppercase tracking-[0.4em] block opacity-75 mt-0.5 whitespace-nowrap">Constanța • Black Sea</span>
+            </a>
+
+            <div class="flex items-center space-x-8">
+                <a href="#harta" class="hidden lg:inline-block text-xs uppercase tracking-[0.2em] opacity-80 hover:opacity-100 transition-opacity">
+                    44.1598° N, 28.6348° E
+                </a>
+                <a href="#rezerva" class="border border-current px-4 py-2 md:px-6 md:py-2.5 text-[10px] md:text-xs uppercase tracking-[0.2em] hover:bg-white hover:text-sea transition-colors duration-300">
+                    Rezervă
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================= MENIU MOBIL (overlay) ================= -->
+    <div id="mobile-menu" class="md:hidden fixed inset-0 z-[90] bg-sea text-sand flex flex-col px-6 pt-5 pb-10">
+        <div class="flex justify-between items-center">
+            <span class="text-[10px] uppercase tracking-[0.3em] text-sand/50">Meniu</span>
+            <button type="button" onclick="toggleMenu(false)" aria-label="Închide meniul" class="p-2 -mr-2 text-[10px] uppercase tracking-[0.3em] text-sand/70">
+                Închide ✕
+            </button>
+        </div>
+        <nav class="my-auto flex flex-col gap-6">
+            <a href="#sanctuar" onclick="toggleMenu(false)" class="menu-link font-serif text-4xl font-light">Sanctuarul</a>
+            <a href="#cazare" onclick="toggleMenu(false)" class="menu-link font-serif text-4xl font-light">Refugii</a>
+            <a href="#experienta" onclick="toggleMenu(false)" class="menu-link font-serif text-4xl font-light">Experiența</a>
+            <a href="#harta" onclick="toggleMenu(false)" class="menu-link font-serif text-4xl font-light">Coasta</a>
+        </nav>
+        <div class="space-y-5">
+            <a href="#rezerva" onclick="toggleMenu(false)" class="block w-full text-center bg-gold text-sea py-4 text-xs uppercase tracking-[0.25em]">
+                Rezervă un refugiu
+            </a>
+            <div class="flex justify-between text-[10px] uppercase tracking-[0.2em] text-sand/50">
+                <a href="mailto:concierge@tomissanctuary.ro">Concierge</a>
+                <span>44.1598° N, 28.6348° E</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= HERO SECTION ================= -->
+    <section class="relative min-h-[100svh] md:min-h-0 md:h-screen w-full flex flex-col justify-between overflow-hidden">
+        <video id="hero-video" autoplay loop muted playsinline poster="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=2000&q=80" class="absolute inset-0 w-full h-full object-cover">
+            <!-- Valuri filmate aerian (Pexels) + fallback plajă (Mixkit) -->
+            <source src="https://videos.pexels.com/video-files/1918465/1918465-hd_1920_1080_24fps.mp4" type="video/mp4">
+            <source src="https://assets.mixkit.co/videos/5016/5016-720.mp4" type="video/mp4">
+        </video>
+
+        <div class="absolute inset-0 bg-sea/45 backdrop-brightness-75"></div>
+
+        <div class="relative z-10"></div>
+
+        <div class="relative z-10 text-center text-white px-6 md:px-4 pt-24 pb-10 md:pt-0 md:pb-0 max-w-4xl mx-auto my-auto reveal active">
+            <p class="text-[10px] md:text-sm uppercase tracking-[0.28em] md:tracking-[0.35em] mb-5 md:mb-6 opacity-90">Redefinirea liniștii la Marea Neagră</p>
+            <h1 class="font-serif text-[2.75rem] md:text-7xl lg:text-8xl font-light leading-[1.05] tracking-wide mb-0 md:mb-8">
+                Arhitectură efemeră,<br><span class="italic font-normal">suflet marin.</span>
+            </h1>
+        </div>
+
+        <!-- Booking Bar -->
+        <div id="rezerva" class="relative z-10 w-full max-w-5xl mx-auto px-4 pb-5 md:pb-12 reveal">
+            <form onsubmit="handleBooking(event)" class="bg-sand/95 backdrop-blur-md text-sea p-5 md:p-6 shadow-2xl grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-4 md:gap-4 items-center border border-white/20">
+                <div class="border-b md:border-b-0 md:border-r border-sea/15 pb-3 md:pb-0 md:pr-4">
+                    <label class="block text-[10px] uppercase tracking-[0.2em] text-stone mb-1">Check-In</label>
+                    <input type="date" required class="w-full bg-transparent text-base md:text-sm font-normal focus:outline-none cursor-pointer">
+                </div>
+                <div class="border-b md:border-b-0 md:border-r border-sea/15 pb-3 md:pb-0 md:px-4">
+                    <label class="block text-[10px] uppercase tracking-[0.2em] text-stone mb-1">Check-Out</label>
+                    <input type="date" required class="w-full bg-transparent text-base md:text-sm font-normal focus:outline-none cursor-pointer">
+                </div>
+                <div class="col-span-2 md:col-span-1 border-b md:border-b-0 md:border-r border-sea/15 pb-3 md:pb-0 md:px-4">
+                    <label class="block text-[10px] uppercase tracking-[0.2em] text-stone mb-1">Oaspeți</label>
+                    <select class="w-full bg-transparent text-base md:text-sm font-normal focus:outline-none cursor-pointer">
+                        <option>2 Adulți</option>
+                        <option>1 Adult</option>
+                        <option>2 Adulți, 1 Copil</option>
+                        <option>4 Adulți (Vila Privată)</option>
+                    </select>
+                </div>
+                <div class="col-span-2 md:col-span-1 md:pl-2">
+                    <button type="submit" class="w-full bg-sea text-sand py-4 text-xs uppercase tracking-[0.25em] hover:bg-gold hover:text-sea transition-colors duration-500">
+                        Caută Refugiu
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- ================= INTRO / MANIFESTO ================= -->
+    <section id="sanctuar" class="py-20 md:py-40 px-7 md:px-6 max-w-4xl mx-auto text-center">
+        <div class="reveal">
+            <span class="text-[10px] md:text-[11px] uppercase tracking-[0.3em] text-gold block mb-5 md:mb-6">Capul Midia • Constanța</span>
+            <h2 class="font-serif text-[1.7rem] md:text-5xl font-light leading-snug md:leading-relaxed text-sea mb-8 md:mb-10">
+                Ascuns între dunele sălbatice și briza vechiului Tomis, am creat un refugiu fără pereți de beton. Doar pânză organică, lemn adus de valuri și orizontul nesfârșit.
+            </h2>
+            <div class="w-px h-16 bg-sea/20 mx-auto"></div>
+        </div>
+    </section>
+
+    <!-- ================= CAMERE / REFUGII ================= -->
+    <section id="cazare" class="py-12 md:py-24 px-6 md:px-16 max-w-7xl mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-baseline mb-8 md:mb-16 reveal">
+            <div>
+                <span class="text-[10px] md:text-[11px] uppercase tracking-[0.3em] text-stone block mb-2">Colecția de Sezon</span>
+                <h3 class="font-serif text-[2.4rem] leading-[1.1] md:text-5xl font-light">Refugiile Noastre</h3>
+            </div>
+            <p class="text-sm text-stone max-w-xs mt-4 md:mt-0">
+                Fiecare spațiu este proiectat să lase lumina dimineții și sunetul mării să pătrundă neîngrădit.
+            </p>
+            <span class="md:hidden mt-5 text-[10px] uppercase tracking-[0.25em] text-gold">Glisează pentru toate refugiile →</span>
+        </div>
+
+        <!-- Mobil: carusel orizontal cu snap • Desktop: grilă de 3 coloane -->
+        <div class="flex md:grid md:grid-cols-3 gap-4 md:gap-10 overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-6 px-6 md:mx-0 md:px-0 pb-2 md:pb-0 no-scrollbar">
+            <!-- Card 1 -->
+            <article class="room-card group cursor-pointer reveal w-[84%] shrink-0 snap-center md:w-auto" onclick="openModal('Pavilionul Dune')">
+                <div class="img-wrapper relative aspect-[4/5] overflow-hidden bg-sandDark mb-4 md:mb-6">
+                    <img src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1000&q=85"
+                         alt="Pavilionul Dune"
+                         class="w-full h-full object-cover">
+                    <div class="absolute top-3 right-3 md:top-4 md:right-4 bg-sand/90 backdrop-blur-sm px-3 py-1 text-[10px] md:text-[11px] uppercase tracking-[0.15em]">
+                        De la €240 / noapte
+                    </div>
+                </div>
+                <div class="flex flex-col md:flex-row md:justify-between md:items-baseline gap-1 md:gap-0">
+                    <h4 class="font-serif text-2xl font-normal group-hover:text-gold transition-colors">Pavilionul Dune</h4>
+                    <span class="text-[10px] md:text-xs uppercase tracking-[0.18em] md:tracking-[0.2em] text-stone">45 m² • Vedere la Mare</span>
+                </div>
+                <p class="text-sm text-stone mt-2 line-clamp-2">
+                    Terasă privată din lemn de tec, duș exterior sub cerul liber și lenjerie din in 100% organic.
+                </p>
+            </article>
+
+            <!-- Card 2 -->
+            <article class="room-card group cursor-pointer reveal w-[84%] shrink-0 snap-center md:w-auto md:mt-12" onclick="openModal('Cortul Safari Pontic')">
+                <div class="img-wrapper relative aspect-[4/5] overflow-hidden bg-sandDark mb-4 md:mb-6">
+                    <img src="https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1000&q=85"
+                         alt="Cortul Nomad"
+                         class="w-full h-full object-cover">
+                    <div class="absolute top-3 right-3 md:top-4 md:right-4 bg-sand/90 backdrop-blur-sm px-3 py-1 text-[10px] md:text-[11px] uppercase tracking-[0.15em]">
+                        De la €190 / noapte
+                    </div>
+                </div>
+                <div class="flex flex-col md:flex-row md:justify-between md:items-baseline gap-1 md:gap-0">
+                    <h4 class="font-serif text-2xl font-normal group-hover:text-gold transition-colors">Cortul Safari Pontic</h4>
+                    <span class="text-[10px] md:text-xs uppercase tracking-[0.18em] md:tracking-[0.2em] text-stone">38 m² • Acces Direct Plajă</span>
+                </div>
+                <p class="text-sm text-stone mt-2 line-clamp-2">
+                    Arhitectură nomadă la 20 de pași de apă. Pat king-size, sobă pe lemne pentru serile răcoroase.
+                </p>
+            </article>
+
+            <!-- Card 3 -->
+            <article class="room-card group cursor-pointer reveal w-[84%] shrink-0 snap-center md:w-auto" onclick="openModal('Vila Farul Genovez')">
+                <div class="img-wrapper relative aspect-[4/5] overflow-hidden bg-sandDark mb-4 md:mb-6">
+                    <img src="https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=85"
+                         alt="Suita Farul Vechi"
+                         class="w-full h-full object-cover">
+                    <div class="absolute top-3 right-3 md:top-4 md:right-4 bg-sand/90 backdrop-blur-sm px-3 py-1 text-[10px] md:text-[11px] uppercase tracking-[0.15em]">
+                        De la €350 / noapte
+                    </div>
+                </div>
+                <div class="flex flex-col md:flex-row md:justify-between md:items-baseline gap-1 md:gap-0">
+                    <h4 class="font-serif text-2xl font-normal group-hover:text-gold transition-colors">Vila Farul Genovez</h4>
+                    <span class="text-[10px] md:text-xs uppercase tracking-[0.18em] md:tracking-[0.2em] text-stone">75 m² • Piscină Privată</span>
+                </div>
+                <p class="text-sm text-stone mt-2 line-clamp-2">
+                    Izolare totală. Piscină încălzită cu apă sărată, vinotecă dobrogeană privată și majordom dedicat.
+                </p>
+            </article>
+        </div>
+    </section>
+
+    <!-- ================= SPLIT EDITORIAL (Experiența) ================= -->
+    <section id="experienta" class="py-16 md:py-36 bg-sandDark/60 mt-10 md:mt-16">
+        <div class="max-w-7xl mx-auto px-6 md:px-16">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-9 md:gap-12 items-center">
+                <div class="lg:col-span-7 relative reveal">
+                    <div class="aspect-[16/11] overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1400&q=85"
+                             alt="Spa & Gastronomie"
+                             class="w-full h-full object-cover">
+                    </div>
+                    <div class="hidden md:block absolute -bottom-10 -right-8 w-64 aspect-square overflow-hidden border-8 border-sand shadow-xl">
+                        <img src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=600&q=80"
+                             alt="Vinuri Dobrogene"
+                             class="w-full h-full object-cover">
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5 lg:pl-8 reveal">
+                    <span class="text-[10px] md:text-[11px] uppercase tracking-[0.3em] text-gold block mb-4">Gastronomie & Ritualuri</span>
+                    <h3 class="font-serif text-[2.1rem] md:text-5xl font-light leading-tight mb-5 md:mb-6">
+                        Foc deschis, sare de mare și vinuri din podgorii uitate.
+                    </h3>
+                    <p class="text-[15px] md:text-sm text-stone leading-relaxed mb-8">
+                        Nu avem meniuri tipărite. Bucătarul nostru gătește la foc de lemne exclusiv ce aduc pescarii din portul Tomis în zori și legume culese din micro-fermele dobrogene. Seara se încheie în sauna panoramică de pe faleză.
+                    </p>
+
+                    <div class="space-y-4 border-t border-sea/10 pt-6 text-[11px] md:text-xs uppercase tracking-[0.14em] md:tracking-[0.2em]">
+                        <div class="flex justify-between">
+                            <span>07:30</span>
+                            <span class="text-stone">Yoga pe ponton la răsărit</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>13:00</span>
+                            <span class="text-stone">Degustare la Crama Histria</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>20:30</span>
+                            <span class="text-stone">Cină privată pe nisip</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= HARTĂ MINIMALISTĂ STILIZATĂ (Constanța) ================= -->
+    <section id="harta" class="bg-sea text-sand py-16 md:py-36 px-6 md:px-16 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 md:gap-12 items-center">
+
+                <!-- Detalii Geografice & Control Hartă (5 coloane) -->
+                <div class="lg:col-span-5 reveal">
+                    <span class="text-[10px] md:text-[11px] uppercase tracking-[0.3em] text-gold block mb-4">Cartografie Pontică</span>
+                    <h3 class="font-serif text-[2.1rem] md:text-5xl font-light leading-tight mb-5 md:mb-6">
+                        Între istoria vechiului Tomis și dunele virgine.
+                    </h3>
+                    <p class="text-[15px] md:text-xs text-sand/70 leading-relaxed mb-8 md:mb-10">
+                        Sanctuarul nostru este poziționat strategic pe faleza nordică, suficient de aproape de inima istorică a Constanței, dar complet izolat de tumultul cotidian.
+                    </p>
+
+                    <!-- Puncte de interes interactive (Click-ul mută harta) -->
+                    <div class="space-y-2 md:space-y-5 border-t border-white/10 pt-4 md:pt-6">
+                        <button onclick="focusMap(44.2150, 28.6450, 'sanctuar')" class="w-full text-left group flex justify-between items-center gap-4 md:gap-0 py-3 md:py-2 border-b border-white/10 hover:border-gold transition-colors">
+                            <div>
+                                <span class="text-xs uppercase tracking-[0.2em] text-gold block">01 • Tomis Sanctuary</span>
+                                <span class="text-xs text-sand/60">Faleza Nord / Capul Midia</span>
+                            </div>
+                            <span class="shrink-0 whitespace-nowrap text-[10px] md:text-xs uppercase tracking-[0.2em] text-sand/50 group-hover:text-gold transition-colors">Explorează →</span>
+                        </button>
+
+                        <button onclick="focusMap(44.1706, 28.6635, 'cazino')" class="w-full text-left group flex justify-between items-center gap-4 md:gap-0 py-3 md:py-2 border-b border-white/10 hover:border-gold transition-colors">
+                            <div>
+                                <span class="text-xs uppercase tracking-[0.2em] block group-hover:text-gold transition-colors">02 • Cazinoul & Portul Tomis</span>
+                                <span class="text-xs text-sand/60">15 minute cu șalupa privată</span>
+                            </div>
+                            <span class="shrink-0 whitespace-nowrap text-[10px] md:text-xs uppercase tracking-[0.2em] text-sand/50 group-hover:text-gold transition-colors">4.2 MN →</span>
+                        </button>
+
+                        <button onclick="focusMap(44.5472, 28.7744, 'histria')" class="w-full text-left group flex justify-between items-center gap-4 md:gap-0 py-3 md:py-2 border-b border-white/10 hover:border-gold transition-colors">
+                            <div>
+                                <span class="text-xs uppercase tracking-[0.2em] block group-hover:text-gold transition-colors">03 • Cetatea Antică Histria</span>
+                                <span class="text-xs text-sand/60">Excursie privată la apus</span>
+                            </div>
+                            <span class="shrink-0 whitespace-nowrap text-[10px] md:text-xs uppercase tracking-[0.2em] text-sand/50 group-hover:text-gold transition-colors">35 Min →</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Container Hartă Interactivă (7 coloane) -->
+                <div class="lg:col-span-7 reveal">
+                    <div class="relative p-2 border border-gold/30 bg-sea shadow-2xl">
+                        <!-- Harta Leaflet -->
+                        <div id="constanta-map" class="w-full h-[340px] md:h-[540px] z-10"></div>
+
+                        <!-- Overlay Coordonate Decorative -->
+                        <div class="absolute bottom-4 left-4 md:bottom-6 md:left-6 z-20 bg-sea/90 backdrop-blur-md border border-white/10 px-4 py-2.5 pointer-events-none">
+                            <span class="text-[9px] uppercase tracking-[0.3em] text-gold block">Black Sea Coastline</span>
+                            <span id="map-coords" class="font-serif text-sm tracking-widest text-sand">44°12'54.0"N 28°38'42.0"E</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= FULL-BLEED ATMOSPHERE BANNER ================= -->
+    <section class="relative h-[55vh] md:h-[65vh] w-full flex items-center justify-center bg-scroll md:bg-fixed bg-center bg-cover"
+             style="background-image: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=2000&q=85');">
+        <div class="absolute inset-0 bg-sea/50"></div>
+        <div class="relative z-10 text-center text-sand max-w-2xl px-6 reveal">
+            <p class="font-serif italic text-[1.9rem] md:text-5xl font-light leading-snug mb-5 md:mb-6">
+                „Luxul adevărat este absența zgomotului.”
+            </p>
+            <span class="text-[10px] uppercase tracking-[0.35em] opacity-80">Deschis exclusiv Mai — Octombrie</span>
+        </div>
+    </section>
+
+    <!-- ================= FOOTER MINIMALIST ================= -->
+    <footer class="bg-sea text-sand pt-14 pb-10 md:py-20 px-6 md:px-16 border-t border-white/10">
+        <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10 md:gap-12 mb-12 md:mb-16">
+            <div class="col-span-2">
+                <span class="font-serif text-[1.7rem] md:text-3xl tracking-[0.15em] block mb-3 md:mb-4">TOMIS SANCTUARY</span>
+                <p class="text-xs text-sand/60 max-w-xs leading-relaxed">
+                    Un concept de ospitalitate sustenabilă pe coasta sălbatică a Constanței.
+                </p>
+            </div>
+
+            <div class="col-span-2 md:col-span-1">
+                <h5 class="text-[10px] uppercase tracking-[0.3em] text-gold mb-4">Locație</h5>
+                <p class="text-xs text-sand/80 leading-relaxed">
+                    Aleea Falezei Nord, Nr. 14<br>
+                    Constanța, 900001<br>
+                    România
+                </p>
+                <a href="mailto:concierge@tomissanctuary.ro" class="inline-block mt-4 text-xs border-b border-gold/50 pb-0.5 hover:text-gold transition-colors">
+                    concierge@tomissanctuary.ro
+                </a>
+            </div>
+
+            <div class="col-span-2 md:col-span-1">
+                <h5 class="text-[10px] uppercase tracking-[0.3em] text-gold mb-4">Jurnalul de Coastă</h5>
+                <p class="text-xs text-sand/60 mb-4">Primește invitații la deschiderea sezonului.</p>
+                <form onsubmit="event.preventDefault(); alert('Vă mulțumim. Veți primi vești de la malul mării.');" class="flex border-b border-sand/30 pb-2">
+                    <input type="email" placeholder="Adresa de email" required class="bg-transparent text-base md:text-xs w-full focus:outline-none placeholder:text-sand/40">
+                    <button type="submit" aria-label="Abonează-te" class="px-2 md:px-0 text-base md:text-xs uppercase tracking-[0.2em] text-gold hover:text-white transition-colors">→</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="max-w-7xl mx-auto pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center text-[10px] uppercase tracking-[0.2em] text-sand/40">
+            <p class="text-center md:text-left leading-relaxed">© 2026 Tomis Sanctuary Constanța. Toate drepturile rezervate.</p>
+            <div class="flex flex-wrap justify-center gap-x-6 gap-y-3 md:flex-nowrap md:gap-0 md:space-x-6 mt-5 md:mt-0">
+                <a href="#" class="hover:text-sand transition-colors">Instagram</a>
+                <a href="#" class="hover:text-sand transition-colors">Arhitectură</a>
+                <a href="#" class="hover:text-sand transition-colors">Politica de Confidențialitate</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ================= MODAL INTERACTIV ================= -->
+    <div id="bookingModal" class="fixed inset-0 z-[95] hidden items-end md:items-center justify-center bg-sea/80 backdrop-blur-sm p-0 md:p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-sand text-sea max-w-md w-full px-7 pt-16 pb-10 md:p-12 relative shadow-2xl border border-sea/10 text-center">
+            <button onclick="closeModal()" class="absolute top-5 right-6 text-xs uppercase tracking-[0.2em] text-stone hover:text-sea">
+                Închide [X]
+            </button>
+            <span class="text-[10px] uppercase tracking-[0.3em] text-gold block mb-3">Solicitare Înregistrată</span>
+            <h4 id="modalTitle" class="font-serif text-3xl font-light mb-4">Verificare Disponibilitate</h4>
+            <p class="text-xs text-stone leading-relaxed mb-8">
+                Deoarece numărul de pavilioane este strict limitat la 12 unități pe sezon, echipa noastră de concierge vă va contacta în câteva momente pentru confirmarea sejurului.
+            </p>
+            <button onclick="closeModal()" class="w-full bg-sea text-sand py-3.5 text-xs uppercase tracking-[0.25em] hover:bg-gold hover:text-sea transition-colors">
+                Am înțeles
+            </button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- ================= SCRIPTS (Design Engineering Logic) ================= -->
+    <script>
+        // 1. SECVENȚA PRELOADER ELEGANT
+        window.addEventListener('DOMContentLoaded', () => {
+            const preloader = document.getElementById('preloader');
+            const bar = document.getElementById('loader-bar');
+            const texts = document.querySelectorAll('.loader-text');
+
+            // Pas 1: Afișare lină a textului și pornire bară aurie
+            setTimeout(() => {
+                texts.forEach(t => t.classList.add('show'));
+                bar.style.width = '100%';
+            }, 100);
+
+            // Pas 2: Ridicarea cortinei și deblocarea scroll-ului
+            setTimeout(() => {
+                preloader.classList.add('loaded');
+                document.body.classList.remove('loading');
+            }, 1700);
+        });
+
+        // 2. INIȚIALIZARE HARTĂ MINIMALISTĂ CONSTANȚA (Leaflet + CartoDB Dark)
+        const map = L.map('constanta-map', {
+            center: [44.2000, 28.6500],
+            zoom: 12,
+            scrollWheelZoom: false, // Previne blocarea scroll-ului pe pagină
+            dragging: !L.Browser.mobile, // Pe telefon, un deget derulează pagina, nu harta
+            zoomControl: false
+        });
+
+        // Adăugare control de zoom minimalist în dreapta sus
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        // Tile-uri Esri Dark Gray (fără cheie API; filtrate prin CSS în verde marin & auriu)
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 16,
+            attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Iconiță Custom Pulsatorie
+        const luxuryPin = L.divIcon({
+            className: 'custom-pin',
+            html: '<div class="pin-pulse"></div><div class="pin-core"></div>',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+        });
+
+        // Adăugare Markere pe coasta Constanței
+        const markers = {
+            sanctuar: L.marker([44.2150, 28.6450], { icon: luxuryPin }).addTo(map)
+                .bindPopup('<div class="p-2 text-center"><span class="text-[9px] uppercase tracking-[0.2em] text-gold block">Destinație</span><strong class="font-serif text-lg font-normal">Tomis Sanctuary</strong><p class="text-[11px] text-stone mt-1">Plajă Privată & Pavilioane</p></div>')
+                .openPopup(),
+
+            cazino: L.marker([44.1706, 28.6635], { icon: luxuryPin }).addTo(map)
+                .bindPopup('<div class="p-2 text-center"><span class="text-[9px] uppercase tracking-[0.2em] text-gold block">Patrimoniu</span><strong class="font-serif text-lg font-normal">Cazinoul & Portul Tomis</strong><p class="text-[11px] text-stone mt-1">Punct de îmbarcare șalupă</p></div>'),
+
+            histria: L.marker([44.5472, 28.7744], { icon: luxuryPin }).addTo(map)
+                .bindPopup('<div class="p-2 text-center"><span class="text-[9px] uppercase tracking-[0.2em] text-gold block">Arheologie & Vin</span><strong class="font-serif text-lg font-normal">Cetatea Histria</strong><p class="text-[11px] text-stone mt-1">Cea mai veche așezare antică</p></div>')
+        };
+
+        // Funcție pentru animarea camerei pe hartă la click pe butoanele din stânga
+        function focusMap(lat, lng, key) {
+            map.flyTo([lat, lng], key === 'histria' ? 11 : 13, {
+                animate: true,
+                duration: 1.5
+            });
+            markers[key].openPopup();
+            document.getElementById('map-coords').textContent = `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E`;
+
+            // Pe mobil harta e sub listă: o aducem în cadru
+            if (window.innerWidth < 768) {
+                document.getElementById('constanta-map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // 3. SCHIMBARE ASPECT NAVBAR LA SCROLL
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 80) {
+                navbar.classList.add('bg-sand/95', 'backdrop-blur-md', 'text-sea', 'py-4', 'shadow-sm');
+                navbar.classList.remove('py-6', 'text-white');
+            } else {
+                navbar.classList.remove('bg-sand/95', 'backdrop-blur-md', 'text-sea', 'py-4', 'shadow-sm');
+                navbar.classList.add('py-6', 'text-white');
+            }
+        });
+
+        // 4. INTERSECTION OBSERVER PENTRU ANIMAȚII LA SCROLL
+        const revealElements = document.querySelectorAll('.reveal');
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, { threshold: 0.12 });
+
+        revealElements.forEach(el => revealObserver.observe(el));
+
+        // 5. SETARE AUTOMATĂ DATE ÎN BOOKING BAR
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        if (dateInputs.length === 2) {
+            const today = new Date();
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 3);
+            dateInputs[0].valueAsDate = today;
+            dateInputs[1].valueAsDate = tomorrow;
+        }
+
+        // 6. MENIU MOBIL
+        const mobileMenu = document.getElementById('mobile-menu');
+        function toggleMenu(open) {
+            mobileMenu.classList.toggle('open', open);
+            document.body.style.overflow = open ? 'hidden' : '';
+        }
+
+        // 7. LOGICĂ MODAL
+        const modal = document.getElementById('bookingModal');
+        const modalTitle = document.getElementById('modalTitle');
+
+        function handleBooking(e) {
+            e.preventDefault();
+            openModal('Sejur Personalizat');
+        }
+
+        function openModal(roomName) {
+            modalTitle.textContent = roomName;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeModal() {
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+    </script>
+</body>
+</html>
